@@ -2,7 +2,10 @@ name: Deploy
 
 on:
   push:
+
     branches: ["master"]
+    branches: [ "master"]
+
 
 jobs:
   deploy:
@@ -13,3 +16,9 @@ jobs:
       - run: docker build . -t harishneel/next-js-app
       - run: echo "${{secrets.DOCKERHUB_PASSWORD}}" | docker login -u ${{secrets.DOCKERHUB_USERNAME}} --password-stdin
       - run: docker push harishneel/next-js-app:latest
+
+    - uses: actions/checkout@v4
+    - run: docker build . -t harishneel/next-js-app
+    - run: echo "${{secrets.DOCKERHUB_PASSWORD}}" | docker login -u ${{secrets.DOCKERHUB_USERNAME}} --password-stdin 
+    - run: docker push harishneel/next-js-app:latest
+
