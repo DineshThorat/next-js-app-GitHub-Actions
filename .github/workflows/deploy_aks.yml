@@ -1,0 +1,95 @@
+name: Build and Deploy to AKS
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  AZURE_CONTAINER_REGISTRY: "dineshacr001"
+  CONTAINER_NAME: "next-js-app"
+  RESOURCE_GROUP: "Dinesh-Thorat-RG"
+  CLUSTER_NAME: "dinesh-cluster-01"
+  DEPLOYMENT_MANIFEST_PATH: "deployment.yaml"
+
+jobs:
+  buildAndPushImage:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Check out the code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Log in to Azure
+      - name: Azure login
+        uses: azure/login@v1
+        with:
+          creds: >
+            {
+              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      # Step 3: Set Azure subscription
+      - name: Set Azure subscription
+        run: az account set --subscription 737d1672-96a9-4ba4-b12c-8027ef27ab4e
+
+      # Step 4: Build and push Docker image to ACR
+      - name: Build and push Docker image to ACR
+        run: |
+          az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY }}
+          docker build . -t ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:latest
+          docker push ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:latest
+
+  deployToAKS:
+    name: Deploy to AKS
+    runs-on: ubuntu-latest
+    needs: buildAndPushImage
+    steps:
+      # Step 1: Check out the code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Log in to Azure
+      - name: Azure login
+        uses: azure/login@v1
+        with:
+          creds: >
+            {
+              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      # Step 3: Set Azure subscription
+      - name: Set Azure subscription
+        run: az account set --subscription 737d1672-96a9-4ba4-b12c-8027ef27ab4e
+
+      # Step 4: Get AKS credentials
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name ${{ env.CLUSTER_NAME }} --overwrite-existing
+
+      # Step 5: Attach ACR to AKS
+      - name: Attach ACR to AKS
+        run: |
+          az aks update --name ${{ env.CLUSTER_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --attach-acr ${{ env.AZURE_CONTAINER_REGISTRY }}
+
+      # Step 6: Set up kubelogin for non-interactive login
+      - name: Set up kubelogin for non-interactive login
+        uses: azure/use-kubelogin@v1
+        with:
+          kubelogin-version: "v0.0.25"
+
+      # Step 7: Deploy application to AKS
+      - name: Deploy application to AKS
+        uses: azure/k8s-deploy@v4
+        with:
+          manifests: ${{ env.DEPLOYMENT_MANIFEST_PATH }}
+          images: |
+            ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:latest

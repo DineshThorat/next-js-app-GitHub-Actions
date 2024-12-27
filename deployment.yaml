@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: next-js-deployment
+  labels:
+    app: next-js-app
+spec:
+  replicas: 3  
+  selector:
+    matchLabels:
+      app: next-js-app
+  template:
+    metadata:
+      labels:
+        app: next-js-app
+    spec:
+      containers:
+      - name: next-js-container
+        image: dineshacr001.azurecr.io/next-js-app:latest  
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: next-js-service
+spec:
+  selector:
+    app: next-js-app
+  ports:
+    - protocol: TCP
+      port: 80           
+      targetPort: 80   
+  type: LoadBalancer     
